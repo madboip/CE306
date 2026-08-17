@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>โปรแกรมแปลงสกุลเงิน</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>โปรแกรมแปลงสกุลเงิน</h1>
+
+    <input type="number" id="amount-one" placeholder="จำนวนเงิน">
+
+    <select id="currency-one">
+        <option value="THB">THB</option>
+        <option value="USD">USD</option>
+        <option value="EUR">EUR</option>
+    </select>
+
+    <br><br>
+
+    <!-- ปุ่มสลับสกุลเงิน -->
+    <button id="swap">⇄ สลับสกุลเงิน</button>
+
+    <br><br>
+
+    <input type="number" id="amount-two" placeholder="จำนวนเงิน">
+
+    <select id="currency-two">
+        <option value="USD">USD</option>
+        <option value="THB">THB</option>
+        <option value="EUR">EUR</option>
+    </select>
+
+    <br>
+
+    <button id="convert">แปลงเงิน</button>
+
+    <button id="clear">ล้างข้อมูล</button>
+
+    <p id="rate">อัตราแลกเปลี่ยนจะแสดงที่นี่</p>
+
+    <p id="time">ยังไม่มีการอัปเดต</p>
+
+    <hr>
+
+    <h2>ประวัติการแปลงเงิน</h2>
+
+    <button id="clear-history">ล้างประวัติ</button>
+
+    <ul id="history"></ul>
+
+</div>
+
+<script src="script.js"></script>
+
+</body>
+</html>
