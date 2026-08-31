@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Income-Expense Tracker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h2>โปรแกรมบัญชีรายรับ-รายจ่าย</h2>
+
+        <!-- Task 4: สรุปรายงานการเงิน -->
+        <div class="summary-container">
+            <div class="box">
+                <h4>รายรับรวม</h4>
+                <p id="total-income" class="money plus">฿0.0</p>
+            </div>
+            <div class="box">
+                <h4>รายจ่ายรวม</h4>
+                <p id="total-expense" class="money minus">฿0.0</p>
+            </div>
+            <div class="box">
+                <h4>ยอดเงินคงเหลือสุทธิ</h4>
+                <p id="net-balance">฿0.0</p>
+            </div>
+        </div>
+
+        <!-- Add Transaction Form -->
+        <h3>เพิ่มรายการใหม่</h3>
+        <div class="form-control">
+            <input type="text" id="text" placeholder="ชื่อรายการ..." />
+            <input type="number" id="amount" placeholder="จำนวนเงิน..." />
+            
+            <select id="type">
+                <option value="income">รายรับ</option>
+                <option value="expense">รายจ่าย</option>
+            </select>
+
+            <!-- Task 1: เพิ่มหมวดหมู่ธุรกรรม -->
+            <select id="category">
+                <option value="" disabled selected>เลือกหมวดหมู่</option>
+                <option value="อาหาร">อาหาร</option>
+                <option value="เดินทาง">เดินทาง</option>
+                <option value="ช้อปปิ้ง">ช้อปปิ้ง</option>
+                <option value="เงินเดือน">เงินเดือน</option>
+                <option value="อื่นๆ">อื่นๆ</option>
+            </select>
+            <button id="btn-add" class="btn">เพิ่มข้อมูล</button>
+        </div>
+
+        <!-- Task 2: เพิ่มตัวกรองและค้นหารายการ -->
+        <h3>ประวัติรายการ</h3>
+        <div class="search-container">
+            <input type="text" id="search" placeholder="ค้นหาชื่อรายการ (Real-time filter)..." />
+        </div>
+
+        <!-- Task 3: แสดงประวัติรายการทั้งหมด -->
+        <ul id="list" class="list">
+            <!-- <li> items will be injected via JavaScript -->
+        </ul>
+
+        <!-- Task 5: เพิ่มปุ่มล้างประวัติทั้งหมด -->
+        <button id="btn-clear" class="btn btn-danger">ล้างข้อมูลทั้งหมด</button>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
