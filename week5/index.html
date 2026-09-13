@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="th" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SHADOW ARENA: ศึกนักรบเงา</title>
+    <!-- เรียกใช้ Tailwind CSS ผ่าน CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- กำหนด Configuration ของ Tailwind สำหรับ Dark Mode และอื่นๆ -->
+    <script>
+        tailwind.config = {
+            darkMode: 'media', // ใช้ Dark Mode ตามระบบปฏิบัติการของผู้ใช้
+            theme: {
+                extend: {
+                    colors: {
+                        arena: {
+                            dark: '#0f172a',
+                            light: '#f1f5f9',
+                            cardLight: '#ffffff',
+                            cardDark: '#1e293b'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* รองรับ Forced Colors (High Contrast Mode) */
+        @media (forced-colors: active) {
+            .fc-border { border: 2px solid CanvasText; }
+            .fc-button { border: 1px solid CanvasText; background-color: ButtonFace; color: ButtonText; }
+            .fc-button:hover, .fc-button:focus { outline: 2px solid Highlight; }
+            .fc-health-bar { border: 1px solid CanvasText; }
+            .fc-text { color: CanvasText; }
+        }
+        
+        /* ซ่อน Scrollbar ของ Battle Log แต่ยัง Scroll ได้ */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Animation เล็กน้อยเมื่อโจมตี */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+        }
+        .animate-shake {
+            animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+        }
+        
+        /* Animation สำหรับ Ultimate */
+        @keyframes flash {
+            0%, 100% { background-color: transparent; }
+            50% { background-color: rgba(147, 51, 234, 0.3); }
+        }
+        .animate-flash {
+            animation: flash 0.5s ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-900 dark:bg-slate-900 dark:text-slate-100 min-h-screen flex flex-col font-sans motion-safe:transition-colors motion-safe:duration-300">
+
+    <!-- ================= GAME HEADER ================= -->
+    <header class="bg-slate-800 text-white shadow-md p-4 sticky top-0 z-10 fc-border">
+        <div class="container mx-auto flex flex-wrap items-center justify-between gap-4">
+            <div>
+                <h1 class="text-2xl sm:text-3xl font-bold tracking-wider text-cyan-400 drop-shadow-md">
+                    SHADOW ARENA
+                </h1>
+                <p class="text-sm text-slate-300" aria-live="polite">
+                    🏆 Level <span id="ui-level" class="font-bold text-yellow-400">1</span> | 
+                    ⭐ Score: <span id="ui-score" class="font-bold">0</span>
+                </p>
+            </div>
+            <nav class="flex flex-wrap gap-2" aria-label="Game Controls">
+                <button onclick="showHowToPlay()" class="bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded-md shadow focus-visible:ring-2 focus-visible:ring-cyan-400 fc-button transition-colors" aria-label="วิธีเล่น (ปุ่ม I)">
+                    ℹ️ วิธีเล่น
+                </button>
+                <button onclick="increaseLevel()" class="bg-orange-600 hover:bg-orange-500 text-white px-4 py-2 rounded-md shadow focus-visible:ring-2 focus-visible:ring-orange-400 fc-button transition-colors" aria-label="เพิ่ม Level">
+                    ⬆️ เพิ่ม Level
+                </button>
+                <button onclick="resetGame()" class="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-md shadow focus-visible:ring-2 focus-visible:ring-red-400 fc-button transition-colors" aria-label="เริ่มเกมใหม่ (ปุ่ม R)">
+                    🔄 เริ่มใหม่
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- ================= MAIN GAME AREA ================= -->
+    <main class="container mx-auto p-4 flex-1 flex flex-col lg:flex-row gap-6 justify-center items-stretch mt-4">
+        
+        <!-- PLAYER PANEL -->
+        <section class="flex-1 bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6 flex flex-col items-center border-t-4 border-cyan-500 fc-border" aria-labelledby="player-name">
+            <h2 class="sr-only">Player Info</h2>
+            <div id="player-avatar" class="text-7xl mb-4 p-4 bg-cyan-100 dark:bg-slate-700 rounded-full shadow-inner motion-safe:transition-transform">
+                🥷
+            </div>
+            <h3 id="player-name" class="text-2xl font-bold text-cyan-700 dark:text-cyan-400 mb-4 text-center">Shadow Knight</h3>
+            
+            <div class="w-full space-y-4">
+                <!-- HP Bar -->
+                <div>
+                    <div class="flex justify-between text-sm font-semibold mb-1">
+                        <span>❤️ HP</span>
+                        <span id="player-hp-text">100 / 100</span>
+                    </div>
+                    <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-4 fc-health-bar overflow-hidden shadow-inner">
+                        <div id="player-hp-bar" class="bg-green-500 h-4 rounded-full motion-safe:transition-all motion-safe:duration-300" style="width: 100%;" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                </div>
+                <!-- Energy Bar -->
+                <div>
+                    <div class="flex justify-between text-sm font-semibold mb-1">
+                        <span>⚡ Energy</span>
+                        <span id="player-energy-text">0 / 100</span>
+                    </div>
+                    <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-4 fc-health-bar overflow-hidden shadow-inner">
+                        <div id="player-energy-bar" class="bg-yellow-400 h-4 rounded-full motion-safe:transition-all motion-safe:duration-300" style="width: 0%;" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                </div>
+                
+                <div class="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                    <p class="text-sm text-slate-500 dark:text-slate-400">Attack: <span id="player-atk">15</span> | Defense: <span id="player-def">5</span></p>
+                    <p id="player-status" class="text-sm font-bold text-emerald-500 mt-2 h-5"></p>
+                </div>
+            </div>
+        </section>
+
+        <!-- BATTLE AREA & LOG -->
+        <section class="flex-[1.5] flex flex-col gap-4">
+            
+            <!-- Game Status Indicator -->
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow p-3 text-center fc-border border border-slate-200 dark:border-slate-700">
+                <h2 id="turn-indicator" class="text-xl font-bold text-cyan-600 dark:text-cyan-400" aria-live="polite">Your Turn</h2>
+            </div>
+
+            <!-- Battle Log -->
+            <div class="flex-1 bg-slate-50 dark:bg-slate-900 rounded-xl shadow-inner border border-slate-200 dark:border-slate-700 p-4 fc-border relative">
+                <h3 class="absolute top-2 right-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Battle Log</h3>
+                <div id="battle-log" class="h-48 lg:h-64 overflow-y-auto no-scrollbar space-y-2 mt-4 text-sm font-mono" aria-live="polite" aria-relevant="additions text">
+                    <p class="text-slate-500 dark:text-slate-400">⚔️ ยินดีต้อนรับสู่ Shadow Arena! การต่อสู้เริ่มขึ้นแล้ว!</p>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2" aria-label="Battle Actions">
+                <button id="btn-attack" onclick="playerAction('attack')" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-lg shadow disabled:opacity-50 disabled:cursor-not-allowed focus-visible:ring-4 focus-visible:ring-blue-400 fc-button motion-safe:transition-transform motion-safe:active:scale-95 flex flex-col items-center">
+                    <span class="text-xl mb-1">⚔️</span>
+                    <span class="text-sm">Attack (A)</span>
+                </button>
+                <button id="btn-skill" onclick="playerAction('skill')" class="bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-4 rounded-lg shadow disabled:opacity-50 disabled:cursor-not-allowed focus-visible:ring-4 focus-visible:ring-purple-400 fc-button motion-safe:transition-transform motion-safe:active:scale-95 flex flex-col items-center disabled:grayscale">
+                    <span class="text-xl mb-1">🔥</span>
+                    <span class="text-sm">Skill (S) <br><span class="text-xs font-normal">30 EN</span></span>
+                </button>
+                <button id="btn-defend" onclick="playerAction('defend')" class="bg-slate-600 hover:bg-slate-500 text-white font-bold py-3 px-4 rounded-lg shadow disabled:opacity-50 disabled:cursor-not-allowed focus-visible:ring-4 focus-visible:ring-slate-400 fc-button motion-safe:transition-transform motion-safe:active:scale-95 flex flex-col items-center">
+                    <span class="text-xl mb-1">🛡️</span>
+                    <span class="text-sm">Defend (D)</span>
+                </button>
+                <button id="btn-heal" onclick="playerAction('heal')" class="bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-4 rounded-lg shadow disabled:opacity-50 disabled:cursor-not-allowed focus-visible:ring-4 focus-visible:ring-green-400 fc-button motion-safe:transition-transform motion-safe:active:scale-95 flex flex-col items-center">
+                    <span class="text-xl mb-1">❤️</span>
+                    <span class="text-sm">Heal (H) <br><span id="ui-heal-count" class="text-xs font-normal">2/2</span></span>
+                </button>
+                <button id="btn-ultimate" onclick="playerAction('ultimate')" class="col-span-2 sm:col-span-2 bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 px-4 rounded-lg shadow disabled:opacity-50 disabled:cursor-not-allowed focus-visible:ring-4 focus-visible:ring-yellow-400 fc-button motion-safe:transition-transform motion-safe:active:scale-95 flex flex-col items-center disabled:grayscale">
+                    <span class="text-xl mb-1">⚡</span>
+                    <span class="text-sm uppercase tracking-widest">Ultimate (U) <br><span class="text-xs font-normal">100 EN</span></span>
+                </button>
+            </div>
+        </section>
+
+        <!-- ENEMY PANEL -->
+        <section id="enemy-panel" class="flex-1 bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6 flex flex-col items-center border-t-4 border-red-500 fc-border" aria-labelledby="enemy-name">
+            <h2 class="sr-only">Enemy Info</h2>
+            <div class="relative">
+                <div id="enemy-avatar" class="text-7xl mb-4 p-4 bg-red-100 dark:bg-slate-700 rounded-full shadow-inner motion-safe:transition-transform">
+                    👹
+                </div>
+                <span id="enemy-boss-badge" class="hidden absolute -top-2 -right-2 bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full animate-pulse shadow-md">BOSS</span>
+            </div>
+            <h3 id="enemy-name" class="text-2xl font-bold text-red-600 dark:text-red-400 mb-4 text-center">Goblin</h3>
+            
+            <div class="w-full space-y-4">
+                <!-- Enemy HP Bar -->
+                <div>
+                    <div class="flex justify-between text-sm font-semibold mb-1">
+                        <span>❤️ HP</span>
+                        <span id="enemy-hp-text">60 / 60</span>
+                    </div>
+                    <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-4 fc-health-bar overflow-hidden shadow-inner">
+                        <div id="enemy-hp-bar" class="bg-red-500 h-4 rounded-full motion-safe:transition-all motion-safe:duration-300" style="width: 100%;" role="progressbar" aria-valuenow="60" aria-valuemin="0" aria-valuemax="60"></div>
+                    </div>
+                </div>
+                
+                <div class="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                    <p class="text-sm text-slate-500 dark:text-slate-400">Attack: <span id="enemy-atk">10</span></p>
+                    <p id="enemy-status" class="text-sm font-bold text-slate-500 mt-2 h-5"></p>
+                </div>
+            </div>
+        </section>
+        
+    </main>
+
+    <footer class="text-center p-4 text-sm text-slate-500 dark:text-slate-400">
+        &copy; Shadow Arena Project
+    </footer>
+
+    <!-- ================= MODALS (DIALOGS) ================= -->
+
+    <!-- How To Play Modal -->
+    <dialog id="modal-howto" class="bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl shadow-2xl p-0 backdrop:bg-slate-900/80 backdrop:backdrop-blur-sm max-w-lg w-full border border-slate-200 dark:border-slate-700 fc-border">
+        <div class="p-6">
+            <h2 class="text-2xl font-bold mb-4 border-b pb-2 text-cyan-600 dark:text-cyan-400">วิธีเล่น</h2>
+            <ul class="space-y-3 text-sm sm:text-base">
+                <li><span class="font-bold">⚔️ Attack:</span> โจมตีปกติ (ปุ่ม A)</li>
+                <li><span class="font-bold">🔥 Skill:</span> ใช้ 30 Energy เพื่อโจมตีแรงขึ้น (ปุ่ม S)</li>
+                <li><span class="font-bold">🛡️ Defend:</span> ป้องกันเพื่อลด Damage ในเทิร์นถัดไป 50% (ปุ่ม D)</li>
+                <li><span class="font-bold">❤️ Heal:</span> ฟื้นฟู HP 20 หน่วย ใช้ได้จำกัด 2 ครั้งต่อการต่อสู้ (ปุ่ม H)</li>
+                <li><span class="font-bold">⚡ Ultimate:</span> เมื่อ Energy เต็ม 100 ใช้ท่าไม้ตายสร้าง Damage 3 เท่า! (ปุ่ม U)</li>
+                <li class="pt-2 text-slate-500 dark:text-slate-400 text-xs">
+                    * เอาชนะศัตรูให้ถึง Level 5 เพื่อชนะเกม<br>
+                    * สามารถใช้ Keyboard เล่นได้ทั้งหมด<br>
+                    * ปิดหน้าต่างนี้ด้วยปุ่ม I หรือ ESC
+                </li>
+            </ul>
+            <div class="mt-6 flex justify-end">
+                <button onclick="hideHowToPlay()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-6 py-2 rounded shadow focus-visible:ring-2 focus-visible:ring-cyan-400">เข้าใจแล้ว</button>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- Victory Modal (Level Clear) -->
+    <dialog id="modal-victory" class="bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl shadow-2xl p-0 backdrop:bg-slate-900/80 backdrop:backdrop-blur-sm max-w-sm w-full border-t-8 border-t-emerald-500 text-center fc-border">
+        <div class="p-6">
+            <div class="text-5xl mb-4">🏆</div>
+            <h2 class="text-3xl font-bold mb-2 text-emerald-600 dark:text-emerald-400">VICTORY!</h2>
+            <p id="victory-message" class="mb-4">คุณเอาชนะศัตรูได้!</p>
+            <div class="bg-slate-100 dark:bg-slate-700 rounded-lg p-3 text-sm mb-6 text-left space-y-1 inline-block w-full">
+                <p>⭐ Score: <span class="text-yellow-500">+100</span></p>
+                <p>❤️ HP: <span class="text-green-500">+20</span></p>
+                <p>⚡ Energy: <span class="text-yellow-500">+30</span></p>
+            </div>
+            <button onclick="nextLevel()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg shadow focus-visible:ring-4 focus-visible:ring-emerald-400 motion-safe:transition-transform motion-safe:active:scale-95">
+                สู้ต่อไป (Next Level) ➡️
+            </button>
+        </div>
+    </dialog>
+
+    <!-- Game Over Modal -->
+    <dialog id="modal-gameover" class="bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl shadow-2xl p-0 backdrop:bg-red-900/80 backdrop:backdrop-blur-sm max-w-sm w-full border-t-8 border-t-red-600 text-center fc-border">
+        <div class="p-6">
+            <div class="text-5xl mb-4">💀</div>
+            <h2 class="text-3xl font-bold mb-2 text-red-600 dark:text-red-500">GAME OVER</h2>
+            <p class="mb-4 text-slate-600 dark:text-slate-300">คุณพ่ายแพ้ใน Shadow Arena</p>
+            <div class="bg-slate-100 dark:bg-slate-700 rounded-lg p-3 text-sm mb-6">
+                <p>ไปถึง Level: <span id="go-level" class="font-bold">1</span></p>
+                <p>Total Score: <span id="go-score" class="font-bold">0</span></p>
+            </div>
+            <button onclick="resetGame()" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-lg shadow focus-visible:ring-4 focus-visible:ring-red-400 motion-safe:transition-transform motion-safe:active:scale-95">
+                🔄 เล่นใหม่ (Restart)
+            </button>
+        </div>
+    </dialog>
+
+    <!-- Final Victory Modal (Game Complete) -->
+    <dialog id="modal-final-victory" class="bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl shadow-2xl p-0 backdrop:bg-slate-900/90 backdrop:backdrop-blur-md max-w-md w-full border-t-8 border-t-yellow-500 text-center fc-border">
+        <div class="p-8">
+            <div class="text-6xl mb-4 motion-safe:animate-bounce">👑</div>
+            <h2 class="text-3xl font-bold mb-2 text-yellow-500 drop-shadow-md">GAME COMPLETE!</h2>
+            <p class="mb-6 font-semibold">"คุณคือสุดยอดนักรบแห่ง Shadow Arena!"</p>
+            <div class="bg-slate-100 dark:bg-slate-700 rounded-lg p-4 text-sm mb-6 text-left space-y-2">
+                <p>🏆 สำเร็จ Level 5</p>
+                <p>⭐ Final Score: <span id="fv-score" class="font-bold text-yellow-500 text-lg">0</span></p>
+                <p>💥 Total Critical Hits: <span id="fv-crits" class="font-bold">0</span></p>
+                <p>💀 Enemies Defeated: <span id="fv-kills" class="font-bold">0</span></p>
+            </div>
+            <button onclick="resetGame()" class="w-full bg-gradient-to-r from-yellow-600 to-orange-500 hover:from-yellow-500 hover:to-orange-400 text-white font-bold py-3 rounded-lg shadow-lg focus-visible:ring-4 focus-visible:ring-yellow-400 motion-safe:transition-transform motion-safe:active:scale-95">
+                🔄 เล่นอีกครั้ง
+            </button>
+        </div>
+    </dialog>
+
+    <!-- ================= JAVASCRIPT LOGIC ================= -->
+    <script>
+        // ----------------- ข้อมูล Player และศัตรู -----------------
+
+        const initPlayer = {
+            name: "Shadow Knight",
+            maxHp: 100,
+            hp: 100,
+            maxEnergy: 100,
+            energy: 0,
+            attack: 15,
+            defense: 5,
+            maxHeal: 2,
+            healCount: 2,
+            isDefending: false
+        };
+
+        const enemiesData = [
+            { level: 1, name: "Goblin", hp: 60, maxHp: 60, attack: 10, defense: 2, avatar: "👹", isBoss: false },
+            { level: 2, name: "Orc Warrior", hp: 90, maxHp: 90, attack: 14, defense: 3, avatar: "🧌", isBoss: false },
+            { level: 3, name: "Dark Mage", hp: 120, maxHp: 120, attack: 18, defense: 4, avatar: "🧙‍♂️", isBoss: false },
+            { level: 4, name: "Demon Knight", hp: 150, maxHp: 150, attack: 22, defense: 5, avatar: "🧛", isBoss: false },
+            { level: 5, name: "Shadow Lord", hp: 200, maxHp: 200, attack: 28, defense: 8, avatar: "👿", isBoss: true }
+        ];
+
+        // ----------------- Game State -----------------
+        let player = { ...initPlayer };
+        let currentEnemy = null;
+        let currentLevel = 1;
+        let score = 0;
+        let isPlayerTurn = true;
+        let isGameOver = false;
+
+        // สถิติสำหรับหน้าต่างจบเกม
+        let stats = {
+            crits: 0,
+            kills: 0
+        };
+
+        // ----------------- DOM Elements -----------------
+        const uiLevel = document.getElementById('ui-level');
+        const uiScore = document.getElementById('ui-score');
+        const uiHealCount = document.getElementById('ui-heal-count');
+        
+        const playerHpBar = document.getElementById('player-hp-bar');
+        const playerHpText = document.getElementById('player-hp-text');
+        const playerEnergyBar = document.getElementById('player-energy-bar');
+        const playerEnergyText = document.getElementById('player-energy-text');
+        const playerStatus = document.getElementById('player-status');
+        const playerAvatar = document.getElementById('player-avatar');
+
+        const enemyName = document.getElementById('enemy-name');
+        const enemyAvatar = document.getElementById('enemy-avatar');
+        const enemyHpBar = document.getElementById('enemy-hp-bar');
+        const enemyHpText = document.getElementById('enemy-hp-text');
+        const enemyAtk = document.getElementById('enemy-atk');
+        const enemyStatus = document.getElementById('enemy-status');
+        const enemyBossBadge = document.getElementById('enemy-boss-badge');
+        const enemyPanel = document.getElementById('enemy-panel');
+
+        const battleLog = document.getElementById('battle-log');
+        const turnIndicator = document.getElementById('turn-indicator');
+
+        const btnAttack = document.getElementById('btn-attack');
+        const btnSkill = document.getElementById('btn-skill');
+        const btnDefend = document.getElementById('btn-defend');
+        const btnHeal = document.getElementById('btn-heal');
+        const btnUltimate = document.getElementById('btn-ultimate');
+
+        const modalHowTo = document.getElementById('modal-howto');
+        const modalVictory = document.getElementById('modal-victory');
+        const modalGameOver = document.getElementById('modal-gameover');
+        const modalFinalVictory = document.getElementById('modal-final-victory');
+
+        // ----------------- เริ่มต้นระบบเกม -----------------
+
+        function initGame() {
+            player = { ...initPlayer };
+            currentLevel = 1;
+            score = 0;
+            stats = { crits: 0, kills: 0 };
+            isGameOver = false;
+            
+            battleLog.innerHTML = '<p class="text-slate-500 dark:text-slate-400">⚔️ ยินดีต้อนรับสู่ Shadow Arena! การต่อสู้เริ่มขึ้นแล้ว!</p>';
+            
+            loadEnemy(currentLevel);
+            updateUI();
+            setTurn(true);
+        }
+
+        function loadEnemy(level) {
+            // โคลนข้อมูลศัตรูเพื่อไม่ให้กระทบข้อมูลต้นฉบับ
+            const enemyData = enemiesData.find(e => e.level === level) || enemiesData[enemiesData.length - 1];
+            currentEnemy = { ...enemyData };
+            
+            // อัปเดต UI ฝั่งศัตรู
+            enemyName.textContent = currentEnemy.name;
+            enemyAvatar.textContent = currentEnemy.avatar;
+            enemyAtk.textContent = currentEnemy.attack;
+            
+            if (currentEnemy.isBoss) {
+                enemyBossBadge.classList.remove('hidden');
+                enemyPanel.classList.replace('border-red-500', 'border-purple-600');
+            } else {
+                enemyBossBadge.classList.add('hidden');
+                enemyPanel.classList.replace('border-purple-600', 'border-red-500');
+            }
+            
+            log(`<span class="text-red-500 font-bold">ศัตรูปรากฏตัว: ${currentEnemy.name} (Level ${currentLevel})</span>`);
+        }
+
+        // ----------------- ระบบคำนวณและ UI -----------------
+
+        function updateUI() {
+            // Player
+            const hpPercent = Math.max(0, (player.hp / player.maxHp) * 100);
+            playerHpBar.style.width = `${hpPercent}%`;
+            playerHpBar.setAttribute('aria-valuenow', player.hp);
+            playerHpText.textContent = `${Math.ceil(player.hp)} / ${player.maxHp}`;
+            
+            // เปลียนสีหลอดเลือดเมื่อใกล้ตาย
+            if(hpPercent <= 20) {
+                playerHpBar.classList.replace('bg-green-500', 'bg-red-500');
+            } else {
+                playerHpBar.classList.replace('bg-red-500', 'bg-green-500');
+            }
+
+            const energyPercent = Math.min(100, (player.energy / player.maxEnergy) * 100);
+            playerEnergyBar.style.width = `${energyPercent}%`;
+            playerEnergyBar.setAttribute('aria-valuenow', player.energy);
+            playerEnergyText.textContent = `${Math.floor(player.energy)} / ${player.maxEnergy}`;
+
+            uiHealCount.textContent = `${player.healCount}/${player.maxHeal}`;
+            uiLevel.textContent = currentLevel;
+            uiScore.textContent = score;
+
+            // Enemy
+            if (currentEnemy) {
+                const eHpPercent = Math.max(0, (currentEnemy.hp / currentEnemy.maxHp) * 100);
+                enemyHpBar.style.width = `${eHpPercent}%`;
+                enemyHpBar.setAttribute('aria-valuenow', currentEnemy.hp);
+                enemyHpText.textContent = `${Math.ceil(currentEnemy.hp)} / ${currentEnemy.maxHp}`;
+            }
+
+            checkButtonStates();
+        }
+
+        function checkButtonStates() {
+            if (!isPlayerTurn || isGameOver) {
+                btnAttack.disabled = true;
+                btnSkill.disabled = true;
+                btnDefend.disabled = true;
+                btnHeal.disabled = true;
+                btnUltimate.disabled = true;
+                return;
+            }
+
+            btnAttack.disabled = false;
+            btnDefend.disabled = false;
+            btnSkill.disabled = player.energy < 30;
+            btnHeal.disabled = player.healCount <= 0 || player.hp >= player.maxHp;
+            btnUltimate.disabled = player.energy < 100;
+        }
+
+        function setTurn(isPlayer) {
+            if (isGameOver) return;
+            isPlayerTurn = isPlayer;
+            
+            if (isPlayer) {
+                turnIndicator.textContent = "Your Turn";
+                turnIndicator.className = "text-xl font-bold text-cyan-600 dark:text-cyan-400";
+            } else {
+                turnIndicator.textContent = "Enemy Turn";
+                turnIndicator.className = "text-xl font-bold text-red-600 dark:text-red-400";
+            }
+            updateUI();
+        }
+
+        function log(message) {
+            const p = document.createElement('p');
+            p.innerHTML = message;
+            battleLog.appendChild(p);
+            // Scroll to bottom
+            battleLog.scrollTop = battleLog.scrollHeight;
+        }
+
+        function playShakeAnim(elementId) {
+            // ระงับถ้าผู้ใช้เปิดโหมดลด Animation
+            if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+            
+            const el = document.getElementById(elementId);
+            el.classList.remove('animate-shake');
+            void el.offsetWidth; // Trigger reflow
+            el.classList.add('animate-shake');
+        }
+
+        // ----------------- ระบบ Action ของ Player -----------------
+
+        function playerAction(type) {
+            if (!isPlayerTurn || isGameOver) return;
+
+            // ปลดสถานะ Defend ของ Player เมื่อเริ่ม Action ใหม่
+            player.isDefending = false;
+            playerStatus.textContent = "";
+
+            let damage = 0;
+            let logMsg = "";
+
+            if (type === 'attack') {
+                const baseDmg = Math.max(1, player.attack - currentEnemy.defense);
+                const variation = Math.floor(baseDmg * 0.2); // +/- 20%
+                damage = baseDmg + (Math.floor(Math.random() * (variation * 2 + 1)) - variation);
+                
+                // Critical Check (15%)
+                const isCrit = Math.random() < 0.15;
+                if (isCrit) {
+                    damage *= 2;
+                    stats.crits++;
+                    score += 20;
+                    logMsg = `🔥 Critical Hit! ⚔️ คุณโจมตีปกติสร้างความเสียหาย <span class="text-yellow-500 font-bold">${damage}</span>!`;
+                } else {
+                    score += 10;
+                    logMsg = `⚔️ คุณโจมตีปกติสร้างความเสียหาย <span class="font-bold">${damage}</span>`;
+                }
+                
+                player.energy += 15; // โจมตีปกติได้พลังงาน
+                
+            } else if (type === 'skill') {
+                if (player.energy < 30) return;
+                player.energy -= 30;
+                damage = Math.floor((player.attack * 1.8) - currentEnemy.defense);
+                score += 15;
+                logMsg = `🔥 Shadow Slash! สร้างความเสียหายมหาศาล <span class="text-purple-500 font-bold">${damage}</span>!`;
+                
+            } else if (type === 'ultimate') {
+                if (player.energy < 100) return;
+                player.energy -= 100;
+                damage = Math.floor(player.attack * 3);
+                score += 50;
+                logMsg = `<br>🌑 <span class="text-yellow-500 font-bold uppercase text-lg">Shadow Apocalypse!</span> ความมืดกลืนกินศัตรูสร้างความเสียหาย <span class="text-red-500 font-bold text-lg">${damage}</span>!<br>`;
+                
+                // เอฟเฟกต์หน้าจอ
+                document.body.classList.add('animate-flash');
+                setTimeout(() => document.body.classList.remove('animate-flash'), 500);
+
+            } else if (type === 'defend') {
+                player.isDefending = true;
+                player.energy += 10;
+                playerStatus.textContent = "🛡️ กำลังป้องกัน (-50% DMG)";
+                logMsg = `🛡️ คุณตั้งรับ! ความเสียหายครั้งต่อไปจะลดลง 50%`;
+                
+            } else if (type === 'heal') {
+                if (player.healCount <= 0) return;
+                player.healCount--;
+                const healAmt = 20;
+                player.hp = Math.min(player.maxHp, player.hp + healAmt);
+                playerStatus.textContent = "❤️ ฟื้นฟูพลังชีวิต!";
+                logMsg = `❤️ คุณใช้พลังฮีลฟื้นฟู HP <span class="text-green-500 font-bold">${healAmt}</span> หน่วย`;
+                setTimeout(() => { playerStatus.textContent = ""; }, 2000);
+            }
+
+            // จัดการ Damage ต่อศัตรู
+            if (damage > 0) {
+                currentEnemy.hp -= damage;
+                playShakeAnim('enemy-avatar');
+            }
+
+            log(logMsg);
+            
+            // Cap values
+            if (player.energy > player.maxEnergy) player.energy = player.maxEnergy;
+            if (currentEnemy.hp < 0) currentEnemy.hp = 0;
+            
+            updateUI();
+
+            // จบเทิร์นผู้เล่น ตรวจสอบว่าศัตรูตายไหม
+            if (currentEnemy.hp <= 0) {
+                handleEnemyDefeat();
+            } else {
+                setTurn(false);
+                // หน่วงเวลาให้ศัตรูโจมตี
+                setTimeout(enemyTurn, 1000);
+            }
+        }
+
+        // ----------------- ระบบ Action ของศัตรู (AI) -----------------
+
+        function enemyTurn() {
+            if (isGameOver || currentEnemy.hp <= 0) return;
+
+            enemyStatus.textContent = "";
+            let damage = 0;
+            let logMsg = "";
+
+            // สุ่ม Action (0-99)
+            const roll = Math.floor(Math.random() * 100);
+            
+            if (roll < 70) {
+                // 70% Attack
+                damage = Math.max(1, currentEnemy.attack - player.defense);
+                logMsg = `👹 ${currentEnemy.name} โจมตี!`;
+            } else if (roll < 90) {
+                // 20% Heavy Attack
+                damage = Math.max(1, Math.floor(currentEnemy.attack * 1.5) - player.defense);
+                logMsg = `💢 ${currentEnemy.name} ใช้ท่าโจมตีรุนแรง!`;
+            } else {
+                // 10% Defend (ไม่มีผลจริงในโค้ดนี้เพื่อความง่าย แต่แจ้งบอกเฉยๆ)
+                logMsg = `🛡️ ${currentEnemy.name} ตั้งการ์ดป้องกัน!`;
+                enemyStatus.textContent = "🛡️ ป้องกัน";
+                damage = 0;
+            }
+
+            // คำนวณ Damage หากผู้เล่นป้องกันอยู่
+            if (damage > 0) {
+                if (player.isDefending) {
+                    damage = Math.floor(damage * 0.5);
+                    logMsg += ` (ป้องกันได้! โดนความเสียหาย <span class="text-red-400 font-bold">${damage}</span>)`;
+                } else {
+                    logMsg += ` โดนความเสียหาย <span class="text-red-500 font-bold">${damage}</span>!`;
+                }
+                
+                player.hp -= damage;
+                playShakeAnim('player-avatar');
+            }
+
+            log(logMsg);
+            
+            if (player.hp < 0) player.hp = 0;
+            updateUI();
+
+            if (player.hp <= 0) {
+                handleGameOver();
+            } else {
+                setTurn(true);
+            }
+        }
+
+        // ----------------- ระบบ Progression & Modal -----------------
+
+        function handleEnemyDefeat() {
+            stats.kills++;
+            if (currentEnemy.isBoss) {
+                score += 500;
+            } else {
+                score += 100;
+            }
+            updateUI();
+
+            if (currentLevel >= 5) {
+                handleFinalVictory();
+            } else {
+                // Show Level Clear Modal
+                document.getElementById('victory-message').textContent = `คุณเอาชนะ ${currentEnemy.name} ได้!`;
+                modalVictory.showModal();
+            }
+        }
+
+        function nextLevel() {
+            modalVictory.close();
+            
+            // โบนัสเมื่อชนะ
+            player.hp = Math.min(player.maxHp, player.hp + 20);
+            player.energy = Math.min(player.maxEnergy, player.energy + 30);
+            
+            currentLevel++;
+            log(`<br>✨ <span class="text-emerald-500 font-bold">เข้าสู่ Level ${currentLevel}</span>`);
+            
+            loadEnemy(currentLevel);
+            updateUI();
+            setTurn(true);
+        }
+
+        function increaseLevel() {
+            if (currentLevel >= 5) {
+                alert("คุณอยู่ที่ระดับสูงสุด (Level 5 Boss) แล้ว!");
+                return;
+            }
+            
+            // ยืนยันการเพิ่มระดับ (ข้ามเลเวล)
+            if(confirm(`ต้องการเพิ่มระดับความยากไปยัง Level ${currentLevel + 1} ทันทีหรือไม่? (ศัตรูจะเก่งขึ้น)`)) {
+                // ปิด Modal หากเปิดอยู่
+                if(modalVictory.open) modalVictory.close();
+                
+                currentLevel++;
+                log(`<br>⬆️ <span class="text-orange-500 font-bold">เพิ่มระดับความยากเป็น Level ${currentLevel} ทันที!</span>`);
+                loadEnemy(currentLevel);
+                
+                // ไม่ให้ฮีลเต็ม แต่รีเซ็ตเทิร์นให้ผู้เล่น
+                updateUI();
+                setTurn(true);
+            }
+        }
+
+        function handleGameOver() {
+            isGameOver = true;
+            log(`<br>💀 <span class="text-red-600 font-bold uppercase">GAME OVER</span>`);
+            
+            document.getElementById('go-level').textContent = currentLevel;
+            document.getElementById('go-score').textContent = score;
+            
+            setTimeout(() => {
+                modalGameOver.showModal();
+            }, 500);
+        }
+
+        function handleFinalVictory() {
+            isGameOver = true;
+            log(`<br>🏆 <span class="text-yellow-500 font-bold text-xl uppercase">คุณคือผู้ชนะแห่ง Shadow Arena!</span>`);
+            
+            document.getElementById('fv-score').textContent = score;
+            document.getElementById('fv-crits').textContent = stats.crits;
+            document.getElementById('fv-kills').textContent = stats.kills;
+            
+            setTimeout(() => {
+                modalFinalVictory.showModal();
+            }, 1000);
+        }
+
+        function resetGame() {
+            modalGameOver.close();
+            modalFinalVictory.close();
+            initGame();
+        }
+
+        // ----------------- ระบบ Help Modal -----------------
+
+        function showHowToPlay() {
+            modalHowTo.showModal();
+        }
+
+        function hideHowToPlay() {
+            modalHowTo.close();
+        }
+
+        // ----------------- ระบบ Keyboard Control -----------------
+
+        window.addEventListener('keydown', (e) => {
+            // ไม่ทำงานถ้าผู้ใช้พิมพ์อยู่ใน Input (ถ้ามีในอนาคต)
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+            const key = e.key.toLowerCase();
+            
+            // ปุ่ม R : รีเซ็ต
+            if (key === 'r') {
+                if(confirm("ต้องการเริ่มเกมใหม่หรือไม่?")) resetGame();
+                return;
+            }
+            
+            // ปุ่ม I : เปิด/ปิด Info
+            if (key === 'i') {
+                if (modalHowTo.open) {
+                    modalHowTo.close();
+                } else {
+                    modalHowTo.showModal();
+                }
+                return;
+            }
+
+            // ถ้ามี Modal เปิดอยู่ ห้ามกดปุ่มต่อสู้
+            if (modalHowTo.open || modalVictory.open || modalGameOver.open || modalFinalVictory.open) return;
+
+            // ปุ่มต่อสู้
+            if (key === 'a') playerAction('attack');
+            if (key === 's') playerAction('skill');
+            if (key === 'd') playerAction('defend');
+            if (key === 'h') playerAction('heal');
+            if (key === 'u') playerAction('ultimate');
+        });
+
+        // ----------------- เริ่มเกมเมื่อโหลดเสร็จ -----------------
+        window.onload = initGame;
+
+    </script>
+</body>
+</html>
